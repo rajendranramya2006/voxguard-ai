@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#070b14">
+<title>VoxGuard AI - Voice Clone Detection Prototype</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#070b14;color:#eef3ff}
+header{padding:18px 16px;background:#0d1424;border-bottom:1px solid #263149;position:sticky;top:0;z-index:5}
+h1{margin:0;font-size:24px}.sub{color:#9eabc4;font-size:13px;margin-top:5px}
+.wrap{max-width:900px;margin:auto;padding:16px}.nav{display:flex;gap:8px;overflow:auto;margin-bottom:15px}
+.nav button,.btn{border:1px solid #33405b;background:#121b2e;color:#eef3ff;border-radius:10px;padding:10px 13px;cursor:pointer}
+.nav button.active,.btn.primary{background:#2457d6;border-color:#3670ff}
+.card{background:#0d1424;border:1px solid #263149;border-radius:16px;padding:17px;margin-bottom:14px}
+.drop{border:2px dashed #405170;text-align:center;padding:28px 14px;border-radius:14px}
+.drop input{width:100%;margin-top:15px}.file{margin-top:10px;color:#aebbd4;font-size:13px}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.hidden{display:none}
+.score{font-size:48px;font-weight:bold;text-align:center;margin:10px}.risk{text-align:center;font-size:19px;font-weight:bold;padding:10px;border-radius:10px}
+.safe{background:#123522;color:#6ff0a0}.medium{background:#3c3210;color:#ffd95a}.high{background:#40171b;color:#ff8992}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.metric{background:#111a2d;padding:13px;border-radius:12px}.metric b{display:block;font-size:20px;margin-top:5px}
+.bar{height:9px;background:#222d43;border-radius:20px;overflow:hidden;margin-top:7px}.fill{height:100%;background:#4b7cff}
+.timeline{display:flex;height:42px;border-radius:9px;overflow:hidden;margin-top:10px}.seg{flex:1;border-right:1px solid #070b14}.note{color:#9eabc4;font-size:12px;line-height:1.5}
+textarea{width:100%;min-height:130px;background:#080d18;color:#eef3ff;border:1px solid #33405b;border-radius:10px;padding:10px}
+table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px solid #27334a;text-align:left;font-size:13px}
+footer{text-align:center;color:#71809c;font-size:12px;padding:20px}
+.alert{padding:12px;border-radius:10px;background:#28191b;border:1px solid #704148;color:#ffb2b7;margin-top:12px}
+@media(max-width:500px){h1{font-size:20px}.score{font-size:40px}.wrap{padding:11px}}
+</style>
+</head>
+<body>
+<header><div class="wrap" style="padding:0"><h1>🛡️ VoxGuard AI</h1><div class="sub">AI Voice Cloning Impersonation Detection • Mobile Prototype</div></div></header>
+
+<div class="wrap">
+<div class="nav">
+<button class="active" onclick="show('dashboard',this)">Dashboard</button>
+<button onclick="show('analyze',this)">Analyze</button>
+<button onclick="show('verify',this)">Verification</button>
+<button onclick="show('forensics',this)">Forensics</button>
+</div>
+
+<section id="dashboard">
+<div class="card"><h2>Voice Security Dashboard</h2><p class="note">Upload an audio file to run the browser-based prototype analysis.</p>
+<div class="grid">
+<div class="metric">Files analyzed<b id="count">0</b></div>
+<div class="metric">Last risk<b id="lastRisk">—</b></div>
+<div class="metric">Verification<b id="verStatus">Not started</b></div>
+</div></div>
+<div class="card"><h3>Protection Layers</h3>
+<div class="grid">
+<div class="metric">🎙️ Voice Forensics<b>Active</b></div>
+<div class="metric">🧠 Explainable AI<b>Active</b></div>
+<div class="metric">🔐 Evidence Hash<b>Active</b></div>
+<div class="metric">🗣️ Challenge Phrase<b>Ready</b></div>
+</div></div>
+</section>
+
+<section id="analyze" class="hidden">
+<div class="card"><h2>Analyze Audio</h2>
+<div class="drop"><b>Select a voice recording</b><div class="note">MP3, WAV, M4A, AAC supported by the browser</div>
+<input id="audioFile" type="file" accept="audio/*">
+<div id="fileInfo" class="file">No file selected</div></div>
+<div class="actions"><button class="btn primary" onclick="analyze()">🔍 Analyze Voice</button><button class="btn" onclick="clearAll()">Clear</button></div>
+<div id="result" class="hidden"></div>
+<div id="recheckBox" class="hidden"></div>
+</div>
+</section>
+
+<section id="verify" class="hidden">
+<div class="card"><h2>Challenge Phrase Verification</h2>
+<p class="note">For Medium/High risk, ask the speaker to say the generated phrase using a fresh recording.</p>
+<div id="phrase" style="font-size:21px;font-weight:bold;padding:15px;background:#111a2d;border-radius:10px">Press Generate Phrase</div>
+<div class="actions">
+<button class="btn primary" onclick="newPhrase()">🔊 Generate Challenge Phrase</button>
+<button class="btn" id="recordBtn" onclick="startRecording()">🎤 Record Speaker Voice</button>
+<button class="btn" id="stopBtn" onclick="stopRecording()" disabled>⏹ Stop Recording</button>
+<button class="btn" onclick="compareFreshVoice()">🔍 Compare Fresh Voice</button>
+</div>
+<div id="recordStatus" class="note" style="margin-top:10px">Microphone not started.</div>
+<audio id="recordedAudio" controls class="hidden" style="width:100%;margin-top:10px"></audio>
+<div class="note" style="margin-top:10px">Speaker should say the generated phrase in a fresh recording. This is supporting verification evidence, not identity proof.</div>
+<div id="verifyResult"></div>
+</div>
+</section>
+
+<section id="forensics" class="hidden">
+<div class="card"><h2>Voice Forensics</h2><div id="forensicBox" class="note">Analyze an audio file first.</div></div>
+<div class="card"><h2>Prevention Center</h2>
+<div class="grid">
+<div class="metric">☎️ Unknown caller<b>Verify identity</b></div>
+<div class="metric">🔑 Sensitive request<b>Use challenge phrase</b></div>
+<div class="metric">📁 Evidence<b>Save hash + report</b></div>
+<div class="metric">🚨 High risk<b>Stop & re-check</b></div>
+</div></div>
+</section>
+
+<footer>Prototype only: the AI score is simulated in the browser and is not proof that a voice is cloned.</footer>
+</div>
+
+<script>
+let current=null,lastScore=null,analysisData=null;
+const phrases=["Please verify your identity now","Blue mango seven twenty","My secure phrase is ready","Call me back through the official number","Seven stars over the green field"];
+
+function show(id,btn){
+ document.querySelectorAll("section").forEach(x=>x.classList.add("hidden"));
+ document.getElementById(id).classList.remove("hidden");
+ document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));
+ btn.classList.add("active");
+}
+document.getElementById("audioFile").addEventListener("change",function(){
+ current=this.files[0];
+ document.getElementById("fileInfo").textContent=current?current.name+" • "+Math.round(current.size/1024)+" KB • "+(current.type||"audio"): "No file selected";
+});
+
+function clamp(n,a,b){return Math.max(a,Math.min(b,n))}
+function seeded(str){
+ let h=2166136261;
+ for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}
+ return Math.abs(h>>>0);
+}
+function riskFor(s){return s<=30?"SAFE":s<=70?"MEDIUM":"HIGH"}
+function riskClass(s){return s<=30?"safe":s<=70?"medium":"high"}
+
+function makeFactors(score,seed){
+ let raw=[18+(seed%25),18+((seed>>5)%25),16+((seed>>10)%24),15+((seed>>15)%23),12+((seed>>20)%20)];
+ let sum=raw.reduce((a,b)=>a+b,0);
+ return raw.map(x=>Math.round(x/sum*score));
+}
+function analyze(){
+  if(!current){alert("Please select an audio file first.");return}
+
+  let seed=seeded(current.name+"|"+current.size+"|"+current.type);
+  let score=20+(seed%61);
+  score=clamp(score+Math.floor(Math.random()*9)-4,0,100);
+
+  let factors=makeFactors(score,seed);
+  let labels=["Pitch Anomaly","Spectral Irregularity","Speech Pattern Anomaly","Pause / Timing Anomaly","Audio Quality / Compression"];
+  let risk=riskFor(score);
+
+  // IMPORTANT: this is a prototype score, not a trained AI detector.
+  let humanSignal=clamp(100-score+Math.floor(Math.random()*11)-5,0,100);
+  let syntheticSignal=score;
+
+  lastScore=score;
+  analysisData={score,risk,factors,labels,seed,file:current.name,size:current.size,type:current.type,time:new Date().toLocaleString(),humanSignal,syntheticSignal};
+
+  let count=Number(localStorage.getItem("vg_count")||0)+1;
+  localStorage.setItem("vg_count",count);
+  localStorage.setItem("vg_last",risk);
+
+  document.getElementById("count").textContent=count;
+  document.getElementById("lastRisk").textContent=risk;
+  document.getElementById("verStatus").textContent=score<=30?"Not required":"Required";
+  document.getElementById("result").classList.remove("hidden");
+
+  let verdict = score<=30
+    ? "LOW AI-CLONE SUSPICION"
+    : score<=70
+    ? "UNCERTAIN — VERIFY"
+    : "HIGH AI-CLONE SUSPICION";
+
+  document.getElementById("result").innerHTML=`
+  <div class="card" style="margin-top:14px">
+    <div class="note">VoxGuard Voice Assessment</div>
+    <div class="score">${score}%</div>
+    <div class="risk ${riskClass(score)}">${verdict}</div>
+
+    <div class="grid" style="margin-top:14px">
+      <div class="metric">Human-like signal<b>${humanSignal}%</b><div class="bar"><div class="fill" style="width:${humanSignal}%"></div></div></div>
+      <div class="metric">Synthetic suspicion<b>${syntheticSignal}%</b><div class="bar"><div class="fill" style="width:${syntheticSignal}%"></div></div></div>
+    </div>
+
+    <p class="note" style="margin-top:12px">${explain(score)}</p>
+
+    <h3>Risk Factors</h3>
+    ${labels.map((l,i)=>`<div>${l}: <b>${factors[i]}%</b><div class="bar"><div class="fill" style="width:${factors[i]}%"></div></div></div>`).join("<br>")}
+
+    <h3>Decision Guide</h3>
+    <div class="alert">
+      ${score<=30
+        ? "No strong simulated warning. Continue normal identity checks for sensitive requests."
+        : score<=70
+        ? "The result is uncertain. Ask for a fresh challenge phrase and verify through a trusted channel."
+        : "Do not rely on the voice alone. Stop the sensitive request and verify the person using an independent trusted channel."}
+    </div>
+
+    <h3>Audio Timeline</h3>
+    <div class="timeline">${Array.from({length:12},(_,i)=>`<div class="seg" style="background:${((seed+i*17)%100)<score?'#b65b62':'#294267'}"></div>`).join("")}</div>
+    <div class="note">Highlighted regions are simulated suspicious areas for the prototype.</div>
+
+    <div class="actions">
+      <button class="btn primary" onclick="newPhrase();showVerify()">🗣️ Re-check with Challenge Phrase</button>
+      <button class="btn" onclick="downloadReport()">📄 Download Forensic Report</button>
+    </div>
+  </div>`;
+
+  document.getElementById("forensicBox").innerHTML=`
+    <table><tr><th>Property</th><th>Value</th></tr>
+    <tr><td>File</td><td>${esc(current.name)}</td></tr>
+    <tr><td>Type</td><td>${esc(current.type||"Unknown")}</td></tr>
+    <tr><td>Size</td><td>${Math.round(current.size/1024)} KB</td></tr>
+    <tr><td>AI-clone suspicion</td><td>${score}%</td></tr>
+    <tr><td>Human-like signal</td><td>${humanSignal}%</td></tr>
+    <tr><td>Risk</td><td>${risk}</td></tr>
+    <tr><td>Evidence fingerprint</td><td id="hash">Generating…</td></tr></table>`;
+
+  makeHash(current).then(h=>{
+    let el=document.getElementById("hash");
+    if(el) el.textContent=h;
+  });
+
+  if(score>30){
+    newPhrase();
+    document.getElementById("recheckBox").classList.remove("hidden");
+    document.getElementById("recheckBox").innerHTML=`
+      <div class="alert"><b>Verification recommended:</b> Ask the speaker to repeat the generated challenge phrase using a fresh recording, then use "Compare Fresh Voice".</div>`;
+  }
+}
+
+function showVerify(){
+  let btn=document.querySelector('.nav button:nth-child(3)');
+  show('verify',btn);
+}
+
+function explain(score){
+ if(score<=30)return "The prototype found fewer simulated indicators. This does not prove the recording is genuine.";
+ if(score<=70)return "Several simulated voice-forensics indicators crossed the review threshold. Confirm the speaker with a challenge phrase.";
+ return "Multiple simulated indicators crossed the high-risk threshold. Do not rely on the voice alone; verify identity through a trusted channel.";
+}
+function newPhrase(){document.getElementById("phrase").textContent=phrases[Math.floor(Math.random()*phrases.length)]}
+let mediaRecorder=null,recordedChunks=[],recordedBlob=null;
+
+async function startRecording(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    document.getElementById("recordStatus").textContent="Microphone recording is not supported in this browser.";
+    return;
+  }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    recordedChunks=[]; recordedBlob=null;
+    mediaRecorder=new MediaRecorder(stream);
+    mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recordedChunks.push(e.data)};
+    mediaRecorder.onstop=()=>{
+      recordedBlob=new Blob(recordedChunks,{type:mediaRecorder.mimeType||"audio/webm"});
+      document.getElementById("recordedAudio").src=URL.createObjectURL(recordedBlob);
+      document.getElementById("recordedAudio").classList.remove("hidden");
+      document.getElementById("recordStatus").textContent="Recording saved. Press Compare Fresh Voice.";
+      stream.getTracks().forEach(t=>t.stop());
+    };
+    mediaRecorder.start();
+    document.getElementById("recordBtn").disabled=true;
+    document.getElementById("stopBtn").disabled=false;
+    document.getElementById("recordStatus").textContent="🎤 Recording... Say the challenge phrase.";
+  }catch(e){
+    document.getElementById("recordStatus").textContent="Microphone permission was not granted.";
+  }
+}
+
+function stopRecording(){
+  if(mediaRecorder && mediaRecorder.state!=="inactive"){
+    mediaRecorder.stop();
+    document.getElementById("recordBtn").disabled=false;
+    document.getElementById("stopBtn").disabled=true;
+  }
+}
+
+function compareFreshVoice(){
+  if(lastScore==null){
+    document.getElementById("verifyResult").innerHTML='<div class="alert">Analyze the first voice recording before verification.</div>';
+    return;
+  }
+  if(!recordedBlob){
+    document.getElementById("verifyResult").innerHTML='<div class="alert">First record the speaker voice using the generated challenge phrase.</div>';
+    return;
+  }
+  let consistency=clamp(100-lastScore+Math.floor(Math.random()*21)-10,0,100);
+  let status=consistency>=75?"CONSISTENT":"REVIEW REQUIRED";
+  document.getElementById("verifyResult").innerHTML=`
+    <div class="metric" style="margin-top:12px">
+      🎤 Fresh Speaker Voice<b>${consistency}% consistency</b>
+      <div class="bar"><div class="fill" style="width:${consistency}%"></div></div>
+      <div class="note" style="margin-top:8px">${status==="CONSISTENT"
+        ?"The fresh challenge response produced a reasonably consistent prototype signal."
+        :"The fresh challenge response did not produce a strong consistency signal; use another trusted verification method."}</div>
+    </div>
+    <div class="alert" style="margin-top:10px"><b>${status}</b><br>
+      Supporting evidence only — this prototype does not establish identity or prove AI generation.</div>`;
+  document.getElementById("verStatus").textContent=status==="CONSISTENT"?"Passed":"Review";
+}
+
+async function makeHash(file){
+ try{
+  const buf=await file.arrayBuffer();
+  if(window.crypto&&crypto.subtle){
+   const dig=await crypto.subtle.digest("SHA-256",buf);
+   return Array.from(new Uint8Array(dig)).map(b=>b.toString(16).padStart(2,"0")).join("");
+  }
+ }catch(e){}
+ return "Browser SHA-256 unavailable";
+}
+function downloadReport(){
+ if(!analysisData)return;
+ let a=analysisData;
+ let text=`VOXGUARD AI — FORENSIC PROTOTYPE REPORT
+Generated: ${a.time}
+File: ${a.file}
+Type: ${a.type||"Unknown"}
+Size: ${a.size} bytes
+
+AI-GENERATED VOICE SUSPICION: ${a.score}%
+RISK LEVEL: ${a.risk}
+HUMAN-LIKE SIGNAL: ${a.humanSignal}%
+SYNTHETIC SUSPICION: ${a.syntheticSignal}%
+
+RISK FACTORS
+${a.labels.map((x,i)=>x+": "+a.factors[i]+"%").join("\n")}
+
+EXPLANATION
+${explain(a.score)}
+
+CHALLENGE PHRASE
+Use a fresh recording and compare speaker consistency.
+
+IMPORTANT
+This is a browser-based prototype with simulated detection logic. Human-like signal and synthetic suspicion are prototype indicators, not proof of AI cloning or human authenticity. A production system should use a trained audio-forensics model, calibrated thresholds, adversarial testing, and secure backend verification.
+`;
+ let blob=new Blob([text],{type:"text/plain"});
+ let url=URL.createObjectURL(blob), link=document.createElement("a");
+ link.href=url;link.download="VoxGuard_Forensic_Report.txt";link.click();URL.revokeObjectURL(url);
+}
+function clearAll(){
+ document.getElementById("audioFile").value="";
+ document.getElementById("fileInfo").textContent="No file selected";
+ document.getElementById("result").classList.add("hidden");
+ document.getElementById("forensicBox").textContent="Analyze an audio file first.";
+ current=null;
+}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+document.getElementById("count").textContent=localStorage.getItem("vg_count")||0;
+document.getElementById("lastRisk").textContent=localStorage.getItem("vg_last")||"—";
+</script>
+</body>
+</html>
